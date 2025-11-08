@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Niko Auto Core USA</title>
+<style>
+body { font-family: Arial, sans-serif; padding: 20px; background: #f9f9f9; }
+#login, #app { max-width: 1000px; margin: auto; }
+#app { display: none; }
+input, select, button { margin: 5px 0; padding: 5px; }
+table { width: 100%; border-collapse: collapse; margin-top: 10px; background: #fff; }
+th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+th { background-color: #eee; }
+img { max-width: 50px; }
+h3 { margin-top: 30px; }
+section { margin-bottom: 20px; padding: 10px; background:#fff; border:1px solid #ccc; border-radius:5px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <h2>Niko Auto Core USA - Login</h2>
+  <label>Username: <input type="text" id="username"></label><br>
+  <label>Password: <input type="password" id="password"></label><br>
+  <button onclick="login()">Login</button>
+  <p id="loginMessage" style="color:red;"></p>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <h2>Welcome, <span id="userDisplay"></span></h2>
+  <button onclick="logout()">Logout</button>
+
+  <!-- MARKET PRICES -->
+  <section id="marketPricesSection">
+    <h3>Market Prices (Admin Only)</h3>
+    Pt: <input type="number" id="ptPrice"> $
+    Pd: <input type="number" id="pdPrice"> $
+    Rh: <input type="number" id="rhPrice"> $
+    <button onclick="updateMarketPrices()">Update Prices</button>
+  </section>
+
+  <!-- ADD PRODUCT -->
+  <section id="addProductSection">
+    <h3>Add New Product (Admin Only)</h3>
+    <label>Product Code: <input type="text" id="newProduct"></label><br>
+    <label>Weight (g): <input type="number" id="newWeight"></label><br>
+    <label>Pt ppm: <input type="number" id="newPt"></label><br>
+    <label>Pd ppm: <input type="number" id="newPd"></label><br>
+    <label>Rh ppm: <input type="number" id="newRh"></label><br>
+    <label>Image: <input type="file" id="newImage"></label><br>
+    <button onclick="addProduct()">Add Product</button>
+  </section>
+
+  <!-- SEARCH PRODUCTS -->
+  <section>
+    <h3>Search Product</h3>
+    <input type="text" id="searchInput" placeholder="Enter product code" oninput="searchProduct()">
+  </section>
+
+  <!-- PRODUCT TABLE -->
+  <section>
+    <h3>Product List</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th>Weight (g)</th>
+          <th>Pt ppm</th>
+          <th>Pd ppm</th>
+          <th>Rh ppm</th>
+          <th>Value ($)</th>
+          <th>Image</th>
+        </tr>
+      </thead>
+      <tbody id="productTable"></tbody>
+    </table>
+  </section>
+
+  <!-- USER MANAGEMENT -->
+  <section id="userManagement">
+    <h3>Manage Users (Admin Only)</h3>
+    <label>Username: <input type="text" id="newUsername"></label>
+    <label>Password: <input type="password" id="newUserPassword"></label>
+    <label>Role:
+      <select id="newUserRole">
+        <option value="customer">Customer</option>
+        <option value="admin">Admin</option>
+      </select>
+    </label>
+    <button onclick="addUser()">Add User</button>
+
+    <table>
+      <thead>
+        <tr><th>Username</th><th>Role</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="userTable"></tbody>
+    </table>
+  </section>
+</div>
+
+<script>
+// --- INITIAL DATA ---
+let defaultUsers = [
+  {username:'admin', password:'123456', role:'admin'},
+  {username:'customer', password:'customer123', role:'customer'}
+];
+let defaultProducts = [
+  {product:'CAT123', weight:500, pt:1000, pd:500, rh:200, image:null}
+];
+let defaultPrices = {pt:30, pd:50, rh:200};
+
+// --- LOCAL STORAGE INIT ---
+if(!localStorage.getItem('users')) localStorage.setItem('users', JSON.stringify(defaultUsers));
+if(!localStorage.getItem('products')) localStorage.setItem('products', JSON.stringify(defaultProducts));
+if(!localStorage.getItem('marketPrices')) localStorage.setItem('marketPrices', JSON.stringify(defaultPrices));
+
+let currentUser = null;
+
+// --- UTILITIES ---
+function saveUsers() { localStorage.setItem('users', JSON.stringify(users)); }
+function saveProducts() { localStorage.setItem('products', JSON.stringify(products)); }
+function savePrices() { localStorage.setItem('marketPrices', JSON.stringify(marketPrices)); }
+
+function loadUsers() { return JSON.parse(localStorage.getItem('users')); }
+function loadProducts() { return JSON.parse(localStorage.getItem('products')); }
+function loadPrices() { return JSON.parse(localStorage.getItem('marketPrices')); }
+
+// --- LOGIN / LOGOUT ---
+function login() {
+  let username = document.getElementById('username').value;
+  let password = document.getElementById('password').value;
+  users = loadUsers();
+  let user = users.find(u => u.username === username && u.password === password);
+  if(user){
+    currentUser = user;
+    document.getElementById('login').style.display='none';
+    document.getElementById('app').style.display='block';
+    document.getElementById('userDisplay').innerText = user.username;
+    products = loadProducts();
+    marketPrices = loadPrices();
+    if(user.role!=='admin'){
+      document.getElementById('marketPricesSection').style.display='none';
+      document.getElementById('userManagement').style.display='none';
+      document.getElementById('addProductSection').style.display='none';
+    }
+    renderProducts();
+    renderUsers();
+    document.getElementById('ptPrice').value = marketPrices.pt;
+    document.getElementById('pdPrice').value = marketPrices.pd;
+    document.getElementById('rhPrice').value = marketPrices.rh;
+  } else {
+    document.getElementById('loginMessage').innerText='Invalid credentials!';
+  }
+}
+
+function logout(){
+  currentUser=null;
+  document.getElementById('login').style.display='block';
+  document.getElementById('app').style.display='none';
+}
+
+// --- MARKET PRICES ---
+function updateMarketPrices(){
+  if(currentUser.role!=='admin') return;
+  marketPrices.pt = parseFloat(document.getElementById('ptPrice').value);
+  marketPrices.pd = parseFloat(document.getElementById('pdPrice').value);
+  marketPrices.rh = parseFloat(document.getElementById('rhPrice').value);
+  savePrices();
+  renderProducts();
+}
+
+// --- PRODUCTS ---
+function calculateValue(p){
+  const ptV = p.weight/1000*(p.pt/1000000)*marketPrices.pt*1000;
+  const pdV = p.weight/1000*(p.pd/1000000)*marketPrices.pd*1000;
+  const rhV = p.weight/1000*(p.rh/1000000)*marketPrices.rh*1000;
+  return (ptV+pdV+rhV).toFixed(2);
+}
+
+function renderProducts(filtered=products){
+  const tbody=document.getElementById('productTable');
+  tbody.innerHTML='';
+  filtered.forEach(p=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${p.product}</td>
+                  <td>${p.weight}</td>
+                  <td>${p.pt}</td>
+                  <td>${p.pd}</td>
+                  <td>${p.rh}</td>
+                  <td>${calculateValue(p)}</td>
+                  <td>${p.image?'<img src="'+p.image+'">':''}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function searchProduct(){
+  const q=document.getElementById('searchInput').value.toLowerCase();
+  renderProducts(products.filter(p=>p.product.toLowerCase().includes(q)));
+}
+
+function addProduct(){
+  if(currentUser.role!=='admin') return;
+  const product=document.getElementById('newProduct').value;
+  const weight=parseFloat(document.getElementById('newWeight').value);
+  const pt=parseFloat(document.getElementById('newPt').value);
+  const pd=parseFloat(document.getElementById('newPd').value);
+  const rh=parseFloat(document.getElementById('newRh').value);
+  const imageFile=document.getElementById('newImage').files[0];
+  if(!product || !weight || !pt || !pd || !rh) return alert('Fill all fields');
+  const reader = new FileReader();
+  reader.onload = e=>{
+    const img = e.target.result;
+    products.push({product, weight, pt, pd, rh, image:img});
+    saveProducts();
+    renderProducts();
+  }
+  if(imageFile) reader.readAsDataURL(imageFile);
+  else{
+    products.push({product, weight, pt, pd, rh, image:null});
+    saveProducts();
+    renderProducts();
+  }
+  document.getElementById('newProduct').value='';
+  document.getElementById('newWeight').value='';
+  document.getElementById('newPt').value='';
+  document.getElementById('newPd').value='';
+  document.getElementById('newRh').value='';
+  document.getElementById('newImage').value='';
+}
+
+// --- USERS ---
+function renderUsers(){
+  if(currentUser.role!=='admin') return;
+  users = loadUsers();
+  const tbody=document.getElementById('userTable');
+  tbody.innerHTML='';
+  users.forEach((u,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${u.username}</td><td>${u.role}</td>
+                  <td><button onclick="deleteUser(${i})">Delete</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function addUser(){
+  if(currentUser.role!=='admin') return;
+  const username=document.getElementById('newUsername').value;
+  const password=document.getElementById('newUserPassword').value;
+  const role=document.getElementById('newUserRole').value;
+  if(!username || !password) return alert('Fill all fields');
+  users.push({username,password,role});
+  saveUsers();
+  renderUsers();
+  document.getElementById('newUsername').value='';
+  document.getElementById('newUserPassword').value='';
+}
+
+function deleteUser(index){
+  if(currentUser.role!=='admin') return;
+  if(users[index].username===currentUser.username) return alert("Can't delete yourself!");
+  users.splice(index,1);
+  saveUsers();
+  renderUsers();
+}
+</script>
+</body>
+</html>
